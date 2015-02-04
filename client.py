@@ -5,4 +5,4 @@ class client:
 	def __init__( self ):
 		name = raw_input( "Enter a nickname: " )
 		ip = socket.gethostbyname( socket.gethostname() )
-		self.gamer = player( name, ip )
+		self.__gamer = player( name, ip )

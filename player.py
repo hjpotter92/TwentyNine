@@ -1,4 +1,4 @@
 class player:
 	def __init__( self, alias, IP = '' ):
-		self.alias = alias
-		self.ip = ip
+		self.__alias = alias
+		self.__ip = ip
