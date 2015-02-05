@@ -49,19 +49,43 @@ class server:
 		shuffle( deck_copy )
 		return zip( *[iter(deck_copy)] * 4 )
 
+	def forward( self, source, msg, readlist ):
+		for s in readlist:
+			if s != self.__listener and s != source:
+				s.send( msg )
+
 	def run( self ):
 		self.__listener = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
 		self.__listener.bind( self.GetAddress() )
+		self.__listener.setblocking( 0 )
+		self.__listener.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
+		self.__listener.listen( 4 )
+		read, write, error = [ self.__listener ], [], []
 		listening = True
-		try:
-			while listening:
-				r, w, x = select( [ self.__listener ], [], [], 0 )
-				for x in r:
-					print x
-					print x, x.recvfrom( 1024 )
-		except Exception, e:
-			listening = False
-			raise e
+		while listening:
+			r, w, x = select( read, write, error, 0 )
+			for s in r:
+				if s is self.__listener:
+					c, a = s.accept()
+					read.append( c )
+					print a, "Connection established"
+				else:
+					try:
+						data = s.recv( 32 )
+						if data:
+							print data.strip()
+							if data.strip() == "quit":
+								s.close()
+								read.remove()
+							self.forward( s, data, read )
+					except socket.timeout, e:
+						print e
+						continue
+					except:
+						print a, c
+						s.close()
+						read.remove( s )
+						continue
 		self.__listener.close()
 
 if __name__ == "__main__":
