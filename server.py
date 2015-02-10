@@ -24,6 +24,7 @@ suites, faces = [
 class server:
 	def __init__( self, ip = "", port = 0 ):
 		self.SetAddress( ip, port )
+		self.__SetSocket()
 		self.__bid = 16				# Minimum bid is 16
 		self.__trump_suite = None
 		self.__deck = []
@@ -31,6 +32,13 @@ class server:
 			for j in faces:
 				x = card( j[0], i, j[1] )
 				self.__deck.append( x )
+
+	def __SetSocket( self, blocking = 0, queue = 4 ):
+		self.__listener = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
+		self.__listener.bind( self.GetAddress() )
+		self.__listener.setblocking( blocking )
+		self.__listener.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
+		self.__listener.listen( queue )
 
 	def GetIP( self ):
 		return self.__ip
@@ -55,11 +63,7 @@ class server:
 				s.send( msg )
 
 	def run( self ):
-		self.__listener = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
-		self.__listener.bind( self.GetAddress() )
-		self.__listener.setblocking( 0 )
-		self.__listener.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
-		self.__listener.listen( 4 )
+		self.__SetSocket( 0, 4 )
 		read, write, error = [ self.__listener ], [], []
 		listening = True
 		while listening:
