@@ -8,3 +8,6 @@ class player:
 
 	def GetNick( self ):
 		return self.__alias
+
+if __name__ == "__main__":
+	pass
