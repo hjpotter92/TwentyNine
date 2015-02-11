@@ -2,6 +2,7 @@ import socket
 from pygame.locals import *
 from pygame import font, event as pyevent, display, draw
 from player import player
+from config import *
 
 def GetKey():
 	while True:
@@ -15,10 +16,10 @@ def GetKey():
 def BoxDisplay( scr, msg ):
 	text, w, h = font.Font( None, 24 ), scr.get_width(), scr.get_height()
 	pos_x, pos_y = w / 2 - 200, h / 2 - 30
-	draw.rect( scr, (128, 128, 128), (pos_x, pos_y, 400, 60), 0 )
-	draw.rect( scr, (255, 255, 255), (pos_x - 2, pos_y - 2, 404, 64), 1 )
+	draw.rect( scr, COLOURS.get('GREY'), (pos_x, pos_y, 400, 60), 0 )
+	draw.rect( scr, COLOURS.get('WHITE'), (pos_x - 2, pos_y - 2, 404, 64), 1 )
 	if len( msg ) > 0:
-		scr.blit( text.render(msg, 1, (255, 255, 255)), (pos_x, pos_y) )
+		scr.blit( text.render(msg, 1, COLOURS.get('WHITE')), (pos_x + 20, pos_y + 18) )
 	display.flip()
 
 def AskQuestion( screen, question ):
