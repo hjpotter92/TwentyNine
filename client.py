@@ -1,12 +1,15 @@
 import socket
+from select import select
 from pygame.locals import *
-from pygame import font, event as pyevent, display, draw
+from pygame import font, event as pyevent, display, draw, quit as pyquit
 from player import player
 from config import *
 
 def GetKey():
 	while True:
 		event = pyevent.poll()
+		if event.type == QUIT:
+			return K_ESCAPE
 		if event.type == KEYDOWN:
 			if event.key in range( 256, 266 ):
 				# For keys pressed in numberpad
@@ -25,6 +28,7 @@ def BoxDisplay( scr, msg ):
 def AskQuestion( screen, question ):
 	font.init()
 	response = []
+	display.set_caption( question )
 	while True:
 		BoxDisplay( screen, question + ": " + ''.join(response) )
 		inp = GetKey()
@@ -41,13 +45,55 @@ def AskQuestion( screen, question ):
 	return ''.join( response )
 
 class client:
-	def __init__( self, name, srvIP ):
+	def __init__( self, name, srvIP, srvPort ):
 		ip = socket.gethostbyname( socket.gethostname() )
 		self.__gamer = player( name, ip )
-		self.__server_ip = srvIP
+		self.__server_address = self.__server_ip, self.__server_port = srvIP, srvPort
+		self.__SetListener()
+
+	def __SetListener( self ):
+		self.__listener = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
+		self.__listener.settimeout( 5 )
+		try:
+			self.__listener.connect( self.__server_address )
+		except Exception, e:
+			print "Unable to connect", e
+			raise e
+		print "Connected to %s:%d." % self.__server_address
+
+	def __Quit( self, readlist ):
+		self.__listener.send( "quit" )
+		readlist.remove( self.__listener )
+		self.__listener.close()
+
+	def run( self ):
+		self.__window = display.set_mode( SIZE )
+		display.set_caption( "Twenty Nine" )
+		self.__window.fill( COLOURS.get('BOARD') )
+		read, write, error = [ self.__listener ], [], []
+		while True:
+			r, w, x = select( read, write, error, 0 )
+			for f in r:
+				if f is self.__listener:
+					data = f.recv( 32 )
+					if data:
+						data = data.strip()
+						print data
+			event = pyevent.poll()
+			if event.type == QUIT:
+				self.__Quit( read )
+				break
+			elif event.type == KEYDOWN:
+				if event.key == K_ESCAPE:
+					self.__Quit( read )
+					break
+			elif event.type == MOUSEBUTTONDOWN:
+				print event
 
 if __name__ == "__main__":
 	window = display.set_mode( (600, 400) )
 	alias = AskQuestion( window, "Your nickname" )
 	server_ip = AskQuestion( window, "Server IP" )
-	c = client( alias.strip(), server_ip.strip() )
+	server_port = AskQuestion( window, "Server port" )
+	c = client( alias.strip(), server_ip.strip(), int(server_port) )
+	c.run()

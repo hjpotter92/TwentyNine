@@ -5,7 +5,6 @@ class card:
 		self.__face = face
 		self.__suit = suit
 		self.__value = value
-		self.__piece = template( suit, face )
 
 	def __str__( self ):
 		return "%s%-2s (%d)" % ( self.__suit, self.__face, self.__value )
@@ -18,6 +17,9 @@ class card:
 
 	def GetSuit( self ):
 		return self.__suit
+
+	def CreateFromTemplate( self ):
+		self.__piece = template( suit, face )
 
 if __name__ == "__main__":
 	pass

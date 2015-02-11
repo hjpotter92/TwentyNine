@@ -1,5 +1,5 @@
 from random import shuffle
-from card import card
+from card.card import card
 from score import score
 
 suits = [
