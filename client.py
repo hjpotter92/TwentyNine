@@ -1,9 +1,10 @@
 import socket
 from select import select
 from pygame.locals import *
-from pygame import font, event as pyevent, display, draw, quit as pyquit
+from pygame import font, event as pyevent, display, draw, Surface
 from player import player
 from config import *
+from connect import send, receive
 
 def GetKey():
 	while True:
@@ -49,6 +50,7 @@ class client:
 		ip = socket.gethostbyname( socket.gethostname() )
 		self.__gamer = player( name, ip )
 		self.__server_address = self.__server_ip, self.__server_port = srvIP, srvPort
+		self.__ID = None
 		self.__SetListener()
 
 	def __SetListener( self ):
@@ -60,9 +62,10 @@ class client:
 			print "Unable to connect", e
 			raise e
 		print "Connected to %s:%d." % self.__server_address
+		send( self.__listener, ("Nick", self.__gamer.GetNick()) )
 
 	def __Quit( self, readlist ):
-		self.__listener.send( "quit" )
+		send( self.__listener, ("Quit", self.__ID) )
 		readlist.remove( self.__listener )
 		self.__listener.close()
 
@@ -70,14 +73,16 @@ class client:
 		self.__window = display.set_mode( SIZE )
 		display.set_caption( "Twenty Nine" )
 		self.__window.fill( COLOURS.get('BOARD') )
-		read, write, error = [ self.__listener ], [], []
+		display.flip()
+		self.__read, self.__write, self.__error = [ self.__listener ], [], []
 		while True:
-			r, w, x = select( read, write, error, 0 )
+			r, w, x = select( self.__read, self.__write, self.__error, 0 )
 			for f in r:
 				if f is self.__listener:
-					data = f.recv( 32 )
+					data = receive( f )
 					if data:
-						data = data.strip()
+						if data[0] == "ID":
+							self.__ID = int( data[1] )
 						print data
 			event = pyevent.poll()
 			if event.type == QUIT:
@@ -87,13 +92,10 @@ class client:
 				if event.key == K_ESCAPE:
 					self.__Quit( read )
 					break
+				else:
+					send( self.__listener, chr(event.key) )
 			elif event.type == MOUSEBUTTONDOWN:
 				print event
 
 if __name__ == "__main__":
-	window = display.set_mode( (600, 400) )
-	alias = AskQuestion( window, "Your nickname" )
-	server_ip = AskQuestion( window, "Server IP" )
-	server_port = AskQuestion( window, "Server port" )
-	c = client( alias.strip(), server_ip.strip(), int(server_port) )
-	c.run()
+	pass

@@ -1,8 +1,10 @@
 import socket
 from select import select
 from random import shuffle
-from card.card import card
+from card import card
 from score import score
+from player import player
+from connect import send, receive
 
 suites, faces = [
 	'S',			# Spades
@@ -24,7 +26,7 @@ suites, faces = [
 class server:
 	def __init__( self, ip = "", port = 0 ):
 		self.SetAddress( ip, port )
-		self.__SetSocket()
+		self.__players = []
 		self.__bid = 16				# Minimum bid is 16
 		self.__trump_suite = None
 		self.__deck = []
@@ -57,39 +59,59 @@ class server:
 		shuffle( deck_copy )
 		return zip( *[iter(deck_copy)] * 4 )
 
-	def forward( self, source, msg, readlist ):
-		for s in readlist:
-			if s != self.__listener and s != source:
-				s.send( msg )
+	def __AddPlayer( self, source, nick ):
+		gamer =  player( nick, source.getpeername() )
+		self.__players.append( gamer )
+		send( source, ('ID', self.__players.index(gamer)) )
 
-	def run( self ):
-		self.__SetSocket( 0, 4 )
-		read, write, error = [ self.__listener ], [], []
-		listening = True
-		while listening:
-			r, w, x = select( read, write, error, 0 )
+	def __Forward( self, source, msg ):
+		for s in self.__read:
+			if s != self.__listener and s != source:
+				send( s, msg )
+
+	def __Connect( self ):
+		joining = True
+		while joining:
+			r, w, x = select( self.__read, self.__write, self.__error, 0 )
 			for s in r:
 				if s is self.__listener:
 					c, a = s.accept()
-					read.append( c )
+					self.__read.append( c )
 					print a, "Connection established"
 				else:
+					data = receive( s )
+					if data:
+						if data[0] == "Nick":
+							self.__AddPlayer( s, data[1] )
+						print data, data[0], s.getpeername()
+			if len( self.__players ) == 4:
+				joining = False
+		print self.__players
+		return
+
+	def run( self ):
+		self.__SetSocket( 0, 4 )
+		self.__read, self.__write, self.__error = [ self.__listener ], [], []
+		self.__Connect()
+		print "Players have joined."
+		listening = True
+		while listening:
+			r, w, x = select( self.__read, self.__write, self.__error, 0 )
+			for s in r:
+				if s is self.__listener:
+					pass
+				else:
 					try:
-						data = s.recv( 32 )
+						data = receive( s )
 						if data:
-							print data.strip()
-							if data.strip() == "quit":
-								s.close()
-								read.remove()
-							self.forward( s, data, read )
+							print data
+							self.__Forward( s, data )
 					except socket.timeout, e:
 						print e
 						continue
-					except:
-						print a, c
-						s.close()
-						read.remove( s )
-						continue
+					except KeyboardInterrupt, e:
+						print e
+						break
 		self.__listener.close()
 
 if __name__ == "__main__":
