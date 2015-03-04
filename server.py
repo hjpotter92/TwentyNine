@@ -1,7 +1,7 @@
 import socket
 from select import select
 from random import shuffle
-from card import card
+from card.card import card, Generate
 from score import score
 from player import player
 from connect import send, receive
@@ -29,11 +29,11 @@ class server:
 		self.__players = []
 		self.__bid = 16				# Minimum bid is 16
 		self.__trump_suite = None
-		self.__deck = []
+		self.__pack = []
 		for i in suites:
 			for j in faces:
 				x = card( j[0], i, j[1] )
-				self.__deck.append( x )
+				self.__pack.append( x )
 
 	def __SetSocket( self, blocking = 0, queue = 4 ):
 		self.__listener = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
@@ -41,6 +41,8 @@ class server:
 		self.__listener.setblocking( blocking )
 		self.__listener.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
 		self.__listener.listen( queue )
+		self.__listener.settimeout( 5 )
+		self.__read, self.__write, self.__error = [ self.__listener ], [], []
 
 	def GetIP( self ):
 		return self.__ip
@@ -55,14 +57,40 @@ class server:
 		self.__address = self.__ip, self.__port = ip, port
 
 	def CreatePile( self ):
-		deck_copy = list( self.__deck )
-		shuffle( deck_copy )
-		return zip( *[iter(deck_copy)] * 4 )
+		pack_copy = list( self.__pack )
+		shuffle( pack_copy )
+		return zip( *[iter(pack_copy)] * 8 )
+
+	def __AddClient( self, source ):
+		c, a = source.accept()
+		c.settimeout( 5 )
+		self.__read.append( c )
+		send( c, ("text", "Welcome!") )
+		print a, "Connection established"
+		return
 
 	def __AddPlayer( self, source, nick ):
+		if len( self.__players ) == 4:
+			send( source, ('Error', "4 players already connected.") )
+			self.__read.remove( source )
+			return
 		gamer =  player( nick, source.getpeername() )
 		self.__players.append( gamer )
 		send( source, ('ID', self.__players.index(gamer)) )
+
+	def __RemovePlayer( self, source, gamer_id ):
+		gamer = self.__players.pop( gamer_id )
+		self.__read.remove( source )
+		source.close()
+
+	def __MaintainPlayers( self, source, data ):
+		if data[0] == "Nick":
+			self.__AddPlayer( source, data[1] )
+			return True
+		elif data[0] == "Quit":
+			self.__RemovePlayer( source, data[1] )
+			return True
+		return False
 
 	def __Forward( self, source, msg ):
 		for s in self.__read:
@@ -75,31 +103,51 @@ class server:
 			r, w, x = select( self.__read, self.__write, self.__error, 0 )
 			for s in r:
 				if s is self.__listener:
-					c, a = s.accept()
-					self.__read.append( c )
-					print a, "Connection established"
+					self.__AddClient( s )
 				else:
 					data = receive( s )
 					if data:
-						if data[0] == "Nick":
-							self.__AddPlayer( s, data[1] )
-						print data, data[0], s.getpeername()
+						print data, s.getpeername()
+						if self.__MaintainPlayers( s, data ):
+							pass
 			if len( self.__players ) == 4:
 				joining = False
-		print self.__players
 		return
 
+	def __Bidding( self ):
+		piles, bids, bidding = self.CreatePile(), [], True
+		for i in range( 1, 5 ):
+			s, p = self.__read[i], piles.pop()
+			x = [ y.Compile() for y in p ]
+			print s.getpeername(), x
+			send( s, ('Cards', x) )
+		while bidding:
+			r, w, x = select( self.__read, self.__write, self.__error, 0 )
+			for s in r:
+				if s is self.__listener:
+					self.__AddClient( s )
+				else:
+					data = receive( s )
+					if data:
+						print data, s.getpeername()
+						if self.__MaintainPlayers( s, data ):
+							pass
+			if len( bids ) == 4:
+				bidding = False
+
 	def run( self ):
-		self.__SetSocket( 0, 4 )
-		self.__read, self.__write, self.__error = [ self.__listener ], [], []
+		self.__SetSocket( 1, 4 )
+		print "Waiting for players."
 		self.__Connect()
-		print "Players have joined."
+		print "Players have joined. Bidding started."
+		self.__Bidding()
+		print "Round starts with max. bet: ", self.__bid
 		listening = True
 		while listening:
 			r, w, x = select( self.__read, self.__write, self.__error, 0 )
 			for s in r:
 				if s is self.__listener:
-					pass
+					self.__AddClient( s )
 				else:
 					try:
 						data = receive( s )

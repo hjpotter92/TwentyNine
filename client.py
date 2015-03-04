@@ -1,7 +1,7 @@
 import socket
 from select import select
 from pygame.locals import *
-from pygame import font, event as pyevent, display, draw, Surface
+from pygame import font, event as pyevent, display, draw, Surface, image
 from player import player
 from config import *
 from connect import send, receive
@@ -51,6 +51,8 @@ class client:
 		self.__gamer = player( name, ip )
 		self.__server_address = self.__server_ip, self.__server_port = srvIP, srvPort
 		self.__ID = None
+		self.__hand = Surface( (560, 100) )
+		self.__panel = Surface( (1280, 120) )
 		self.__SetListener()
 
 	def __SetListener( self ):
@@ -63,34 +65,38 @@ class client:
 			raise e
 		print "Connected to %s:%d." % self.__server_address
 		send( self.__listener, ("Nick", self.__gamer.GetNick()) )
+		self.__read, self.__write, self.__error = [ self.__listener ], [], []
 
-	def __Quit( self, readlist ):
+	def __Quit( self ):
 		send( self.__listener, ("Quit", self.__ID) )
-		readlist.remove( self.__listener )
+		self.__read.remove( self.__listener )
 		self.__listener.close()
 
 	def run( self ):
+		icon = image.load( "Icon.png" )
+		display.set_icon( icon )
 		self.__window = display.set_mode( SIZE )
 		display.set_caption( "Twenty Nine" )
 		self.__window.fill( COLOURS.get('BOARD') )
 		display.flip()
-		self.__read, self.__write, self.__error = [ self.__listener ], [], []
 		while True:
 			r, w, x = select( self.__read, self.__write, self.__error, 0 )
 			for f in r:
 				if f is self.__listener:
 					data = receive( f )
 					if data:
+						print data
 						if data[0] == "ID":
 							self.__ID = int( data[1] )
-						print data
+						if data[0] == "Cards":
+							print data[1]
 			event = pyevent.poll()
 			if event.type == QUIT:
-				self.__Quit( read )
+				self.__Quit()
 				break
 			elif event.type == KEYDOWN:
 				if event.key == K_ESCAPE:
-					self.__Quit( read )
+					self.__Quit()
 					break
 				else:
 					send( self.__listener, chr(event.key) )
