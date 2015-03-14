@@ -26,7 +26,7 @@ suites, faces = [
 class server:
 	def __init__( self, ip = "", port = 0 ):
 		self.SetAddress( ip, port )
-		self.__players = []
+		self.__players = {}
 		self.__bid = 16				# Minimum bid is 16
 		self.__trump_suite = None
 		self.__pack = []
@@ -66,21 +66,26 @@ class server:
 		c.settimeout( 5 )
 		self.__read.append( c )
 		send( c, ("text", "Welcome!") )
-		print a, "Connection established"
 		return
 
 	def __AddPlayer( self, source, nick ):
-		if len( self.__players ) == 4:
+		num_players = len( self.__players ) or 0
+		if num_players == 4:
 			send( source, ('Error', "4 players already connected.") )
 			self.__read.remove( source )
+			source.close()
 			return
-		gamer =  player( nick, source.getpeername() )
-		self.__players.append( gamer )
-		send( source, ('ID', self.__players.index(gamer)) )
+		i = 0
+		while self.__players.get( i ):
+			i += 1
+		gamer = player( nick, source.getpeername() )
+		self.__players[i] = gamer
+		send( source, ('ID', i) )
 
 	def __RemovePlayer( self, source, gamer_id ):
 		gamer = self.__players.pop( gamer_id )
 		self.__read.remove( source )
+		self.__Forward( source, ('Leave', gamer_id) )
 		source.close()
 
 	def __MaintainPlayers( self, source, data ):
@@ -112,6 +117,12 @@ class server:
 							pass
 			if len( self.__players ) == 4:
 				joining = False
+		players = []
+		for player_id in self.__players:
+			player = self.__players[player_id]
+			players.append( (player_id, player.GetNick()) )
+		print players
+		self.__Forward( self.__listener, players )
 		return
 
 	def __Bidding( self ):
